@@ -1,56 +1,148 @@
 # PaperFocus
 
-**Question-Guided Evidence Highlighting for Research Papers**<br>
-面向研究论文的提问引导证据高亮
+**Question-guided evidence highlighting for research papers**
 
-上传 PDF，提出阅读问题，由 Jev 对原句相关性评分，再将颜色覆盖在原 PDF 对应位置。
+[简体中文](README.zh-CN.md) · [Presentation script (中文)](docs/paperfocus-talk.zh-CN.md)
 
-## 启动
+PaperFocus is a local-first PDF reader that turns a natural-language question into precise highlights on the original paper. It uses [TypeSafe Jev](https://docs.typesafe.ai/introduction) to score the relevance of candidate passages, then maps the strongest evidence back to its exact page location. It does not generate a replacement summary: the reader remains in control of interpretation.
 
-本机已安装所需 Python/PyMuPDF，可以双击 `启动阅读器.cmd`。若换电脑：
+## Why PaperFocus
 
-```powershell
+Close reading is still necessary when experimental details, qualifications, and source wording matter. Conventional chat workflows require repeated prompts, generated answers, and manual verification against the PDF. PaperFocus shortens that loop:
+
+1. Open a paper.
+2. Ask a specific question.
+3. Jump directly to the most relevant original sentences, paragraphs, figures, and captions.
+
+## Features
+
+- Drag-and-drop PDF import with local parsing and page rendering.
+- Natural-language questions such as “How was the experiment designed?”
+- Two-stage retrieval: paragraph screening followed by sentence-level evidence scoring.
+- Continuous yellow highlighting based on relative salience within the current analysis.
+- Figure-caption evidence grouped as one result; captions are highlighted and matched figures receive a bright, outward-offset dashed frame.
+- Original-order and relevance-order result views.
+- Adjustable salience threshold, defaulting to 75% and calibrated to retain roughly five primary evidence regions on typical papers.
+- Click-to-locate evidence, automatic navigation to the strongest match, 50–200% zoom, and one-, two-, or three-column page layouts.
+- Recent-question recall and JSON export.
+- Per-question Jev request time, excluding upload and local PDF parsing.
+
+## Architecture
+
+```text
+PDF
+ └─ local PyMuPDF extraction
+     ├─ pages and render coordinates
+     ├─ paragraphs and sentences
+     └─ figure captions and nearby graphic regions
+          ↓
+   paragraph screening with Jev
+          ↓
+   sentence/evidence scoring with Jev
+          ↓
+   deterministic ranking, grouping, and salience mapping
+          ↓
+   highlights on the original rendered PDF
+```
+
+Jev performs semantic judgments only. Python and browser code own PDF parsing, batching, coordinate mapping, filtering, sorting, thresholds, and rendering. The application calls TypeSafe's native `POST /v1/systemone` endpoint directly; the TypeSafe agent skill is a development aid and is not a runtime dependency.
+
+## Getting started
+
+### Requirements
+
+- Python 3.10 or later
+- A TypeSafe API key from the [TypeSafe console](https://console.typesafe.ai/)
+
+### Install and run
+
+```bash
+git clone https://github.com/YiLight0/paperfocus.git
+cd paperfocus
 python -m pip install -r requirements.txt
+```
+
+Create `.env` from the included template and add your key:
+
+```env
+TYPESAFE_API_KEY=your_key_here
+TYPESAFE_MODEL=jev-latest
+PORT=8765
+MAX_PDF_MB=200
+```
+
+Then start the local server:
+
+```bash
 python server.py
 ```
 
-访问 http://127.0.0.1:8765 。这不是双击 HTML 即可联网调用的单文件演示：后端负责 PDF 解析和保存密钥。
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765). On Windows, `启动阅读器.cmd` starts the same server.
 
-1. 编辑同目录 `.env`，在 `TYPESAFE_API_KEY=` 后填入从 https://console.typesafe.ai/ 获取的 key，保存后自动读取密钥。也可在网页“连接 Jev”临时填写。
-2. 拖入或选择论文 PDF（支持图文混排），输入问题，点击“定位原文”。
-3. 黄色深浅连续表示本次分析中的相对显著程度。点击原文线索跳转；可调整最低显著度、关闭高亮、恢复最近问题或导出 JSON。
+The key can also be entered temporarily through **Connect Jev** in the interface. Browser-entered keys are kept in server memory and are not written to `.env`. The `.env` file is ignored by Git and is never served over HTTP.
 
-阅读区支持 50%–200% 缩放，以及每行 1、2、3 页显示。首批结果出现时会跳到当前最相关原文；全部评分完成后再定位到全文最高相关处。
+If an explicit network proxy is required, add:
 
-底部只显示服务端记录的 Jev 请求处理时间；不计 PDF 上传、本地解析、浏览器渲染和前端分批调度。TypeSafe 当前响应不提供可与上游网络完全分离的纯推理时间，因此这里不将其表述为 GPU 推理时间。最近问题同时保留各次 Jev 处理时间。
+```env
+TYPESAFE_PROXY=http://127.0.0.1:7890
+```
 
-提问采用两阶段分析：先并行筛选全文段落，再对最多 24 个候选段落定位句子证据；每个阶段最多同时发送 4 批请求。界面计时采用服务端记录的 Jev 请求处理时间，不包含 PDF 上传、本地解析与浏览器渲染，也不等同于可完全排除上游网络的纯模型推理时间。
+## How the analysis works
 
-也可通过 `TYPESAFE_API_KEY` 环境变量配置密钥，通过 `TYPESAFE_MODEL` 覆盖默认 `jev-latest`。`.env` 是本机明文配置，已加入根目录 `.gitignore`；HTTP 服务不会提供该文件。网页临时填写的密钥仅存服务内存，不写回 `.env`。进程环境变量优先于 `.env`。服务关闭后文档与临时密钥消失；浏览器刷新会清除问题历史。提问会向 TypeSafe 发送文本和问题，上传阶段只在本机处理。
+PaperFocus first scores paragraph candidates in parallel. It then evaluates sentences from up to 24 promising paragraphs, retaining at most 64 candidate evidence units and up to four per paragraph before final filtering. Request batches are created from a conservative UTF-8 byte budget; there is no fixed 16-sentence batch limit.
 
-若网络必须使用代理，可在 `.env` 增加 `TYPESAFE_PROXY=http://127.0.0.1:端口`。Windows 下若进程继承到本地拒绝代理，服务会尝试使用系统代理设置；连接失败时页面会区分代理拒绝、DNS、TLS 与读取超时。
+Jev's 0–3 scores are used only to rank evidence for the current question. PaperFocus converts rank and score gaps into a continuous **relative salience** scale. The strongest result is 100%; other percentages are relative to that analysis and are not statistical accuracy or calibrated confidence values.
 
-## 当前范围
+Nearby evidence on the same page is merged into one location. References, author affiliations, and repeated headers or footers are skipped unless the question explicitly asks for them. If no sentence is precise enough but its paragraph remains relevant, the paragraph can be shown as a fallback.
 
-- 200 MB（可通过 `MAX_PDF_MB` 调整，修改大小上限后重启） / 100 页 / 5,000 句以内的可提取文字的 PDF（可以包含图片）；扫描件需另做 OCR。
-- 所有模型判断只调用 Jev；解析、分句、坐标和颜色由普通代码处理。
-- 按段落组织，依据请求长度自动分批，没有固定 16 句限制。段落和各句分别评分；超长段落只能拆分评分目标时，仍保留完整段落上下文。使用保守 UTF-8 字节预算（不是精确 token 计数）。
-- 每次最多深入分析 24 个候选段落，并从中保留最多 64 个待筛选证据，每段最多 4 处。最终显示数量由“最低相对显著度”控制。若整段相关但没有更准确的单句，则以无边框的黄色底色标出整段。参考文献、作者与机构信息、页眉页脚默认跳过，问题明确询问这些内容时才会分析。
-- 同一页、同一段落或版面位置紧邻的证据合并为一处，右侧可以按相关性或原文页码与版面顺序排列。分析期间发送箭头原位变为暂停符号。
-- Jev 的 0–3 原始分只用于本次候选排序。界面结合本次候选的排名和分差，计算连续的相对显著度：最显著证据为 100%，其余逐级降低。显示曲线经过校准，最低相对显著度默认 75%，通常保留约五处上下的主要证据；滑杆、高亮透明度和结果数值共用这套尺度。它不代表统计正确率或置信概率。
-- 句子按各自分数显示连续黄色底色，不绘制段落线框；图注与同页上方匹配的图片作为同一处证据，右侧只出现一项。图注使用黄色文字高亮，图片本身使用向外偏移的粗亮黄色虚线框，不覆盖图片内容。Figure 候选默认获得轻微排序加权，问题明确提到图、Figure、chart、plot 或 diagram 时进一步加权。图片判断仅依据图注；复杂多子图、跨页图注、无编号图注可能漏关联，不声称看懂图内数据。
-- 段落以 PDF 文本块作为初始分组，并非完美语义段落恢复。分句为启发式：缩写、双栏、公式、表格可能解析不佳。可见 PDF 是页面图片，高亮提供句子入口；暂不支持原生文字选中复制。
-- 右侧原句按相关分排序，不生成解释或聊天回答。无相关证据时允许不高亮。
-- 评分仍使用 Jev 的 0–3 结果；展示不再划分“核心／相关”两档，而采用连续显著度。
-- “停止”只取消后续批次；已经发送的 API 请求可能继续计费。
-- 无自动后台分析和演示假分数；没有有效 key 时只可上传阅读。
+## Data and timing boundaries
 
-## 验证
+- PDF upload, extraction, rendering, and coordinate calculation occur locally.
+- Candidate text and the user's question are sent to the TypeSafe API for scoring.
+- Uploaded documents and temporary browser-provided keys remain in server memory and disappear when the server stops.
+- The displayed time is accumulated server-observed Jev request time. It excludes upload, local extraction, browser rendering, and front-end scheduling, but it should not be interpreted as isolated GPU inference time.
 
-`python -m unittest discover -s tests` 检查解析、坐标、评分请求及非法输入。浏览器交互测试使用拦截响应，只验证渲染与流程，不代表真实 Jev 评分效果。实际模型质量、API 权限和端到端耗时需要填入有效 key 后测量。
+## Current limitations
 
-接口来源：https://docs.typesafe.ai/introduction/quickstart
+- Maximum defaults: 200 MB per PDF, 100 pages, and 5,000 extracted sentences. `MAX_PDF_MB` can change the file-size limit.
+- Text must be extractable. Scanned papers require a separate OCR stage.
+- Jev currently receives text only. Figure relevance is inferred from captions and layout; PaperFocus does not claim to interpret pixels or chart values.
+- Complex multi-panel figures, cross-page captions, equations, tables, abbreviations, and unusual multi-column layouts may be segmented imperfectly.
+- The rendered pages provide evidence navigation rather than native PDF text selection.
+- Model quality, latency, and thresholds should be evaluated on the target domain before consequential use.
 
-## 直接 API 调用
+## Tests
 
-后端 `server.py` 使用 Python 标准库 HTTP 请求 TypeSafe 官方接口，不依赖 skill 或 SDK 运行。TypeSafe skill 只帮助开发时查阅规范。解析与预算逻辑在 `document.py`；`.env` 读取在 `settings.py`。
+Run parsing and request-validation tests:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
+
+The Playwright browser test uses intercepted model responses to verify upload, controls, navigation, highlighting, sorting, and responsive layout without spending API credits:
+
+```bash
+node tests/browser.cjs
+```
+
+Mocked UI tests do not measure live Jev quality or latency.
+
+## Project structure
+
+```text
+app.js            Browser interaction, scoring workflow, and evidence rendering
+document.py       PDF extraction, segmentation, figure matching, and batching
+index.html        Minimal application shell
+server.py         Local HTTP server and native TypeSafe API integration
+settings.py       Environment configuration
+style.css         Responsive reader interface
+tests/            Parsing and browser interaction tests
+docs/             Presentation and supporting documentation
+```
+
+## References
+
+- [TypeSafe introduction](https://docs.typesafe.ai/introduction)
+- [TypeSafe quick start](https://docs.typesafe.ai/introduction/quickstart)
+- [System One concepts](https://docs.typesafe.ai/concepts/system-one)
+- [Jev models and pricing](https://docs.typesafe.ai/models)

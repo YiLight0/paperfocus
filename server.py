@@ -66,7 +66,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options','nosniff')
         self.end_headers()
         try: self.wfile.write(raw)
-        except (BrokenPipeError, ConnectionResetError): pass
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError): pass
     def valid_host(self):
         return self.headers.get('Host') in {f'127.0.0.1:{PORT}',f'localhost:{PORT}'}
     def get_doc(self, did):
@@ -127,11 +127,13 @@ class Handler(BaseHTTPRequestHandler):
                 question=body.get('question','')
                 if not isinstance(question,str) or not 1<=len(question.strip())<=500: raise ValueError('问题应为 1–500 个字符。')
                 doc=self.get_doc(body.get('docId'))
-                payload=score_payload(doc,question.strip(),body.get('ids'))
+                ids=body.get('ids')
+                if isinstance(ids,list) and all(isinstance(i,str) for i in ids): ids=list(dict.fromkeys(ids))
+                payload=score_payload(doc,question.strip(),ids)
                 payload['model']=MODEL
                 if not within_budget(payload): raise ValueError('该批内容超出请求预算，请重新提问。')
                 started=time.perf_counter(); result=call_jev(payload,key); scores={}
-                for sid in body['ids']:
+                for sid in ids:
                     answer=result.get('answers',{}).get(sid,{})
                     score=answer.get('score')
                     if isinstance(score,bool) or not isinstance(score,(int,float)) or not 0<=score<=3:

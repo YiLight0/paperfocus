@@ -47,7 +47,7 @@ function entries() {
 }
 const scoreOf=item=>item.score??scores[item.id]??0;
 const asksForFigure=()=>/(?:figure|fig\.?|chart|plot|diagram|image|illustration|图|图表|示意图|曲线|可视化)/i.test(activeQuestion);
-const priorityScoreOf=item=>scoreOf(item)+(item.kind==='figure'?(asksForFigure()?.35:.12):0);
+const priorityScoreOf=item=>scoreOf(item)+(item.kind==='figure'?(asksForFigure()?.65:.2):0);
 const boundsOf=item=>item.rects.reduce((b,r)=>[Math.min(b[0],r[0]),Math.min(b[1],r[1]),Math.max(b[2],r[0]+r[2]),Math.max(b[3],r[1]+r[3])],[1,1,0,0]);
 function mergeNearbyEvidence(items) {
   const ordered=[...items].sort((a,b)=>a.page-b.page||boundsOf(a)[1]-boundsOf(b)[1]||boundsOf(a)[0]-boundsOf(b)[0]),groups=[];
@@ -155,7 +155,9 @@ async function ask(event) {
     };
     const paragraphPlan=await api('/api/plan',{docId:doc.id,question,mode:'paragraphs'},controller.signal);if(token!==generation)return;
     await runBatches(paragraphPlan.batches,'筛选段落');if(token!==generation)return;
-    const paragraphIds=doc.paragraphs.filter(p=>Number.isFinite(scores[p.id])&&scores[p.id]>0).sort((a,b)=>scores[b.id]-scores[a.id]||a.page-b.page).slice(0,24).map(p=>p.id);
+    const figureCaptions=new Set((doc.figures||[]).map(f=>f.captionId));
+    const paragraphPriority=p=>scores[p.id]+(figureCaptions.has(p.id)?(asksForFigure()?.65:.2):0);
+    const paragraphIds=doc.paragraphs.filter(p=>Number.isFinite(scores[p.id])&&scores[p.id]>0).sort((a,b)=>paragraphPriority(b)-paragraphPriority(a)||a.page-b.page).slice(0,24).map(p=>p.id);
     if(paragraphIds.length){
       const sentencePlan=await api('/api/plan',{docId:doc.id,question,mode:'sentences',paragraphIds},controller.signal);if(token!==generation)return;
       await runBatches(sentencePlan.batches,'定位证据');if(token!==generation)return;

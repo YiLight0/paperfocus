@@ -109,6 +109,13 @@ class PaperTests(unittest.TestCase):
         self.assertTrue(all(i.startswith('s') for i in sentence_ids))
         self.assertEqual(sentence_ids,{i for p in doc['paragraphs'] if p['id'] in selected for i in p['sentenceIds']})
 
+    def test_plan_removes_duplicate_targets(self):
+        doc=extract_pdf(fixture());p=doc['paragraphs'][0]
+        p['sentenceIds']=[p['sentenceIds'][0],*p['sentenceIds']]
+        batches=plan_batches(doc,'question','sentences',[p['id']])
+        flat=[i for batch in batches for i in batch]
+        self.assertEqual(len(flat),len(set(flat)))
+
     def test_env_quotes_and_precedence(self):
         with patch.dict(os.environ,{'TYPESAFE_MODEL':'existing'},clear=True):
             path=Mock();path.exists.return_value=True;path.read_text.return_value='# comment\nTYPESAFE_API_KEY="test-value"\nTYPESAFE_MODEL=other\nUNRELATED=no\n'

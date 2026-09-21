@@ -110,7 +110,7 @@ def within_budget(payload):
     return size(payload)<=55000 and size(payload['state'])+max((size(q) for q in payload['questions'].values()),default=0)<=26000
 
 def plan_batches(document,question,mode='all',paragraph_ids=None):
-    batches=[];current=[]
+    batches=[];current=[];planned=set()
     def fits(ids): return within_budget(score_payload(document,question,ids))
     if mode not in {'all','paragraphs','sentences'}: raise ValueError('未知的分析阶段。')
     selected=set(paragraph_ids or [])
@@ -123,7 +123,10 @@ def plan_batches(document,question,mode='all',paragraph_ids=None):
         if mode=='sentences' and p['id'] not in selected: continue
         if p.get('kind')=='references' and not wants_references: continue
         if p.get('kind') in {'metadata','header'} and not wants_metadata: continue
-        group=[p['id']] if mode=='paragraphs' else p['sentenceIds'] if mode=='sentences' else [p['id']]+p['sentenceIds']
+        raw_group=[p['id']] if mode=='paragraphs' else p['sentenceIds'] if mode=='sentences' else [p['id']]+p['sentenceIds']
+        group=[i for i in dict.fromkeys(raw_group) if i not in planned]
+        if not group: continue
+        planned.update(group)
         if fits(current+group): current+=group;continue
         if current: batches.append(current);current=[]
         if fits(group): current=group;continue

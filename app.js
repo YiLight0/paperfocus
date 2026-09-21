@@ -43,7 +43,7 @@ async function upload(file) {
 }
 function entries() {
   if(!doc)return [];
-  return [...doc.sentences,...doc.paragraphs,...(doc.figures||[]).map(f=>({...f,id:f.captionId,rects:[f.groupRect],kind:'figure'}))];
+  return [...doc.sentences,...doc.paragraphs,...(doc.figures||[]).map(f=>({...f,id:f.captionId,rects:f.rects,kind:'figure'}))];
 }
 const scoreOf=item=>item.score??scores[item.id]??0;
 const asksForFigure=()=>/(?:figure|fig\.?|chart|plot|diagram|image|illustration|图|图表|示意图|曲线|可视化)/i.test(activeQuestion);
@@ -55,7 +55,8 @@ function mergeNearbyEvidence(items) {
     const ib=boundsOf(item),last=groups.at(-1),lb=last?.bounds;
     const overlap=last&&Math.max(0,Math.min(lb[2],ib[2])-Math.max(lb[0],ib[0]))/Math.max(.001,Math.min(lb[2]-lb[0],ib[2]-ib[0]));
     const sameParagraph=last&&item.paragraphId&&last.paragraphIds.has(item.paragraphId);
-    const nearby=last&&last.page===item.page&&(sameParagraph||ib[1]-lb[3]<=.025&&ib[1]-lb[3]>=-.08&&overlap>=.25);
+    const mixesFigure=last&&((last.kind==='figure')!==(item.kind==='figure'));
+    const nearby=last&&!mixesFigure&&last.page===item.page&&(sameParagraph||ib[1]-lb[3]<=.025&&ib[1]-lb[3]>=-.08&&overlap>=.25);
     if(nearby) {
       last.members.push(item);last.paragraphIds.add(item.paragraphId);last.score=Math.max(last.score,scoreOf(item));last.kind=last.kind==='figure'||item.kind==='figure'?'figure':'group';
       last.rects.push(...item.rects);last.bounds=[Math.min(lb[0],ib[0]),Math.min(lb[1],ib[1]),Math.max(lb[2],ib[2]),Math.max(lb[3],ib[3])];
@@ -66,7 +67,7 @@ function mergeNearbyEvidence(items) {
 function evidenceEntries() {
   if(!doc)return [];
   const maxParagraphs=24,maxEvidence=64;
-  const figures=(doc.figures||[]).map(f=>({...f,id:f.captionId,paragraphId:f.captionId,rects:[f.groupRect],kind:'figure'}));
+  const figures=(doc.figures||[]).map(f=>({...f,id:f.captionId,paragraphId:f.captionId,rects:f.rects,kind:'figure'}));
   const units=[...doc.sentences,...figures], byParagraph=new Map();
   for(const unit of units) if(Number.isFinite(scores[unit.id])) {
     const list=byParagraph.get(unit.paragraphId)||[];list.push(unit);byParagraph.set(unit.paragraphId,list);

@@ -17,3 +17,5 @@ body.file-drag:after{content:"松开以打开 PDF";position:fixed;inset:10px;z-i
 #askButton.is-paused{font-size:0}
 #askButton.is-paused::before{content:'';display:block;width:11px;height:11px;background:currentColor;border-radius:1px}
 #askButton.is-paused::after{content:none}
+.mark.figure-frame{background:transparent;mix-blend-mode:normal;outline:3px dashed #c99a00;outline-offset:4px;z-index:2}
+.mark.figure-frame.focused{outline:4px dashed #a97900;outline-offset:5px}

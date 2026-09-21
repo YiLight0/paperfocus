@@ -43,7 +43,15 @@ async function upload(file) {
 }
 function entries() {
   if(!doc)return [];
-  return [...doc.sentences,...doc.paragraphs,...(doc.figures||[]).map(f=>({...f,id:f.captionId,rects:f.rects,kind:'figure'}))];
+  return [...doc.sentences,...doc.paragraphs,...figureEntries()];
+}
+function figureEntries() {
+  if(!doc)return [];
+  const paragraphs=new Map(doc.paragraphs.map(p=>[p.id,p]));
+  return (doc.figures||[]).map(f=>{
+    const captionRects=paragraphs.get(f.captionId)?.rects||[];
+    return {...f,id:f.captionId,paragraphId:f.captionId,rects:[...f.rects,...captionRects],figureRects:f.rects,kind:'figure'};
+  });
 }
 const scoreOf=item=>item.score??scores[item.id]??0;
 const asksForFigure=()=>/(?:figure|fig\.?|chart|plot|diagram|image|illustration|图|图表|示意图|曲线|可视化)/i.test(activeQuestion);
@@ -67,8 +75,8 @@ function mergeNearbyEvidence(items) {
 function evidenceEntries() {
   if(!doc)return [];
   const maxParagraphs=24,maxEvidence=64;
-  const figures=(doc.figures||[]).map(f=>({...f,id:f.captionId,paragraphId:f.captionId,rects:f.rects,kind:'figure'}));
-  const units=[...doc.sentences,...figures], byParagraph=new Map();
+  const figures=figureEntries(),figureCaptions=new Set(figures.map(f=>f.captionId));
+  const units=[...doc.sentences.filter(s=>!figureCaptions.has(s.paragraphId)),...figures], byParagraph=new Map();
   for(const unit of units) if(Number.isFinite(scores[unit.id])) {
     const list=byParagraph.get(unit.paragraphId)||[];list.push(unit);byParagraph.set(unit.paragraphId,list);
   }
@@ -107,10 +115,12 @@ function render() {
   document.querySelectorAll('.overlay').forEach(o=>o.replaceChildren());
   const visible=matched;
   for(const s of visible) for(const r of s.rects) {
-    const b=document.createElement('button'); b.className=`mark ${s.kind==='figure'?'figure-frame ':''}${selected===s.id?' focused':''}`;
+    const figureRect=s.kind==='figure'&&s.members.some(m=>m.kind==='figure'&&(m.figureRects||[]).some(fr=>fr.every((v,i)=>Math.abs(v-r[i])<.0001)));
+    const b=document.createElement('button'); b.className=`mark ${figureRect?'figure-frame ':''}${selected===s.id?' focused':''}`;
+    b.dataset.evidenceId=s.id;
     Object.assign(b.style,{left:`${r[0]*100}%`,top:`${r[1]*100}%`,width:`${r[2]*100}%`,height:`${r[3]*100}%`});
     b.style.setProperty('--mark-opacity',(.12+.58*s.salience/100).toFixed(3));
-    b.title=`${s.kind==='figure'?'根据图注关联 · ':''}本次分析相对显著度 ${s.salience}% · ${s.text}`; b.setAttribute('aria-label',b.title); b.onclick=()=>focusEvidence(s.id);
+    b.title=`${figureRect?'根据图注关联 · ':''}本次分析相对显著度 ${s.salience}% · ${s.text}`; b.setAttribute('aria-label',b.title); b.onclick=()=>focusEvidence(s.id);
     $(`page-${s.page}`).querySelector('.overlay').append(b);
   }
   $('results').replaceChildren();

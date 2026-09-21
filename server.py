@@ -143,5 +143,5 @@ class Handler(BaseHTTPRequestHandler):
         except Exception: self.send(500,{'error':'处理失败，请确认 PDF 可正常阅读后重试。'})
 
 if __name__=='__main__':
-    print(f'Evidentia: http://127.0.0.1:{PORT}',flush=True)
+    print(f'PaperFocus: http://127.0.0.1:{PORT}',flush=True)
     ThreadingHTTPServer(('127.0.0.1',PORT),Handler).serve_forever()

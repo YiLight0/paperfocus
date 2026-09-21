@@ -1,7 +1,7 @@
-# Evidentia
+# PaperFocus
 
-**Query-Guided Evidence Localization for Scholarly Documents**<br>
-面向学术文献的查询引导证据定位
+**Question-Guided Evidence Highlighting for Research Papers**<br>
+面向研究论文的提问引导证据高亮
 
 上传 PDF，提出阅读问题，由 Jev 对原句相关性评分，再将颜色覆盖在原 PDF 对应位置。
 

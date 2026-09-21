@@ -46,6 +46,8 @@ function entries() {
   return [...doc.sentences,...doc.paragraphs,...(doc.figures||[]).map(f=>({...f,id:f.captionId,rects:[f.groupRect],kind:'figure'}))];
 }
 const scoreOf=item=>item.score??scores[item.id]??0;
+const asksForFigure=()=>/(?:figure|fig\.?|chart|plot|diagram|image|illustration|图|图表|示意图|曲线|可视化)/i.test(activeQuestion);
+const priorityScoreOf=item=>scoreOf(item)+(item.kind==='figure'?(asksForFigure()?.35:.12):0);
 const boundsOf=item=>item.rects.reduce((b,r)=>[Math.min(b[0],r[0]),Math.min(b[1],r[1]),Math.max(b[2],r[0]+r[2]),Math.max(b[3],r[1]+r[3])],[1,1,0,0]);
 function mergeNearbyEvidence(items) {
   const ordered=[...items].sort((a,b)=>a.page-b.page||boundsOf(a)[1]-boundsOf(b)[1]||boundsOf(a)[0]-boundsOf(b)[0]),groups=[];
@@ -71,9 +73,9 @@ function evidenceEntries() {
   }
   const paragraphs=doc.paragraphs.map(p=>({
     paragraph:p,
-    units:(byParagraph.get(p.id)||[]).sort((a,b)=>scores[b.id]-scores[a.id]||a.page-b.page||a.rects[0][1]-b.rects[0][1])
+    units:(byParagraph.get(p.id)||[]).sort((a,b)=>priorityScoreOf(b)-priorityScoreOf(a)||a.page-b.page||a.rects[0][1]-b.rects[0][1])
   })).filter(x=>x.units.length||Number.isFinite(scores[x.paragraph.id]))
-    .sort((a,b)=>(b.units[0]?scores[b.units[0].id]:scores[b.paragraph.id])-(a.units[0]?scores[a.units[0].id]:scores[a.paragraph.id])||scores[b.paragraph.id]-scores[a.paragraph.id]||a.paragraph.page-b.paragraph.page)
+    .sort((a,b)=>(b.units[0]?priorityScoreOf(b.units[0]):scoreOf(b.paragraph))-(a.units[0]?priorityScoreOf(a.units[0]):scoreOf(a.paragraph))||scoreOf(b.paragraph)-scoreOf(a.paragraph)||a.paragraph.page-b.paragraph.page)
     .slice(0,maxParagraphs);
   const chosen=[];
   for(const {paragraph,units:matches} of paragraphs) {
@@ -82,14 +84,14 @@ function evidenceEntries() {
     if(chosen.length>=maxEvidence)break;
   }
   const merged=mergeNearbyEvidence(chosen.slice(0,maxEvidence));
-  const ranked=[...merged].sort((a,b)=>scoreOf(b)-scoreOf(a)||a.page-b.page||a.bounds[1]-b.bounds[1]);
-  const highest=scoreOf(ranked[0]||{}),lowest=scoreOf(ranked.at(-1)||{}),count=ranked.length;
+  const ranked=[...merged].sort((a,b)=>priorityScoreOf(b)-priorityScoreOf(a)||a.page-b.page||a.bounds[1]-b.bounds[1]);
+  const highest=priorityScoreOf(ranked[0]||{}),lowest=priorityScoreOf(ranked.at(-1)||{}),count=ranked.length;
   const rankById=new Map(ranked.map((item,index)=>[item.id,index]));
   return merged.map(item=>{
     const rank=rankById.get(item.id)||0;
     const rankBase=count<=1?1:(count-1-rank)/(count-1);
     const rankPart=100*Math.pow(rankBase,4.2);
-    const gapPart=highest===lowest?rankPart:100*(scoreOf(item)-lowest)/(highest-lowest);
+    const gapPart=highest===lowest?rankPart:100*(priorityScoreOf(item)-lowest)/(highest-lowest);
     return {...item,salience:Math.round(rankPart*.9+gapPart*.1)};
   }).filter(item=>item.salience>=relevanceThreshold);
 }
@@ -142,7 +144,7 @@ async function ask(event) {
   event?.preventDefault(); if(running||!doc) return; error();
   const question=$('question').value.trim(); if(!question) return error('先写下你想在论文里找的问题。');
   if(!configured) { $('settings').hidden=false;$('apiKey').focus();return error('请先配置 TypeSafe API key，才会进行真实评分。'); }
-  activeQuestion=question; scores={};selected=null;shown=60; render(); busy(true);controller=new AbortController(); const token=++generation,started=performance.now();questionStartedAt=started;questionJevMs=0;let done=0,planned=0;
+  activeQuestion=question; $('question').value=''; scores={};selected=null;shown=60; render(); busy(true);controller=new AbortController(); const token=++generation,started=performance.now();questionStartedAt=started;questionJevMs=0;let done=0,planned=0;
   $('timing').textContent='Jev 处理中…';
   $('progressArea').hidden=false;$('progress').max=1;$('progress').value=0;$('progressCount').textContent='0 / 1';$('progressText').textContent='正在筛选相关段落';
   try {
@@ -192,7 +194,7 @@ $('zoomIn').onclick=()=>{zoom=Math.min(200,zoom+10);applyView();};
 $('columnCount').onchange=e=>{columns=Number(e.target.value);applyView();};
 $('panelToggle').onclick=()=>{const off=document.querySelector('main').classList.toggle('panel-closed');$('panelToggle').setAttribute('aria-expanded',!off);};
 $('exportButton').title='导出本次问题与逐句评分（JSON）';
-$('exportButton').onclick=()=>{const blob=new Blob([JSON.stringify({question:activeQuestion,model:'jev-latest',complete:[...doc.sentences,...doc.paragraphs].every(s=>scores[s.id]!==undefined),paragraphs:doc.paragraphs.map(p=>({...p,score:scores[p.id]})),figures:doc.figures.map(f=>({...f,score:scores[f.captionId],basis:'caption'})),sentences:doc.sentences.filter(s=>scores[s.id]!==undefined).map(s=>({id:s.id,page:s.page,text:s.text,score:scores[s.id]}))},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='evidentia-results.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('exportButton').onclick=()=>{const blob=new Blob([JSON.stringify({question:activeQuestion,model:'jev-latest',complete:[...doc.sentences,...doc.paragraphs].every(s=>scores[s.id]!==undefined),paragraphs:doc.paragraphs.map(p=>({...p,score:scores[p.id]})),figures:doc.figures.map(f=>({...f,score:scores[f.captionId],basis:'caption'})),sentences:doc.sentences.filter(s=>scores[s.id]!==undefined).map(s=>({id:s.id,page:s.page,text:s.text,score:scores[s.id]}))},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='paperfocus-results.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 async function refreshStatus() {
   try {const r=await fetch('/api/status');if(!r.ok)throw new Error();const state=await r.json();configured=state.configured;maxPdfBytes=state.maxPdfBytes||maxPdfBytes;connection();}
   catch { $('connection').textContent='服务未启动'; }

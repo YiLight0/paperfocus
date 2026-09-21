@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Query-guided evidence localization for scholarly documents"><title>Evidentia · Query-Guided Evidence Localization</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><a class="brand" href="/" aria-label="Evidentia 首页"><span class="brand-mark">E.</span> Evidentia</a><div class="header-right"><span class="connection" id="connection" title="Jev 密钥配置状态（不代表已验证 API 权限）">正在连接</span><button id="settingsButton" class="quiet">连接 Jev</button><label class="upload-button" for="fileInput">＋ 打开论文</label><input id="fileInput" type="file" accept="application/pdf" hidden></div></header>
+<div id="settings" class="settings" hidden><div><strong>连接 TypeSafe</strong><p>此处填写的密钥仅保留在内存；也可通过 .env 配置。提问时，文本会发送给 Jev。</p></div><form id="keyForm"><input id="apiKey" type="password" autocomplete="off" placeholder="粘贴 TypeSafe API key" aria-label="TypeSafe API key"><button class="primary">保存连接</button></form><a href="https://console.typesafe.ai/" target="_blank" rel="noreferrer">前往控制台获取密钥 ↗</a></div>
+<main class="workspace">
+<section class="reader" aria-label="论文阅读区">
+<div class="reader-bar"><div class="document-name" id="docName">论文</div><div class="reader-tools"><span id="pageCount"></span><div class="zoom-tools" role="group" aria-label="页面缩放"><button id="zoomOut" class="quiet" aria-label="缩小">−</button><span id="zoomValue">100%</span><button id="zoomIn" class="quiet" aria-label="放大">＋</button></div><label class="column-picker">栏数 <select id="columnCount" aria-label="每行显示页数"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label><button id="highlightToggle" class="quiet" aria-pressed="true">高亮 开</button><button id="panelToggle" class="quiet" aria-expanded="true">问题面板</button></div></div>
+<div id="readerScroll" class="reader-scroll"><div id="welcome" class="welcome"><label for="fileInput" class="drop-zone" id="dropZone" tabindex="0" role="button"><span class="file-symbol">＋</span><strong>打开 PDF</strong><span>拖入或选择 PDF</span></label></div><div id="pages" class="pages"></div></div>
+<footer><span id="readerStatus" role="status"></span><span id="timing"></span></footer>
+</section>
+<aside id="questionPanel"><div class="panel-heading"><h2>问读</h2><span>Jev</span></div><form id="questionForm"><label class="sr-only" for="question">关于论文的问题</label><textarea id="question" maxlength="500" rows="2" placeholder="这篇论文的实验是怎么设计的？"></textarea><div class="question-bottom"><button id="askButton" class="primary" aria-label="定位原文" title="定位原文 · Enter" disabled>↑</button></div></form>
+<div class="error" id="error" role="alert" hidden></div>
+<div class="progress-area" id="progressArea" hidden><div><span id="progressText"></span><span id="progressCount"></span></div><progress id="progress" max="100" value="0"></progress></div>
+<div class="results-head"><h3>相关原文 <span id="matchCount">—</span></h3><div class="result-actions"><label>排序 <select id="resultSort" aria-label="结果排序"><option value="document" selected>原文顺序</option><option value="relevance">相关性</option></select></label><button id="exportButton" class="quiet" disabled>导出</button></div></div>
+<div class="relevance-control" title="以本次分析中最显著的证据为 100，按相对排序与分差连续计算"><label for="relevanceThreshold">最低相对显著度 <output id="thresholdValue" for="relevanceThreshold">50%</output></label><input id="relevanceThreshold" aria-label="最低相对显著度" type="range" min="0" max="100" step="1" value="50"></div>
+
+<div id="results" class="results"><div class="empty-results">提问后，在这里定位相关原文。</div></div><details class="history" id="history" hidden><summary>最近问题</summary><div id="historyItems"></div></details>
+</aside></main><script src="/app.js" defer></script></body></html>

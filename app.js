@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-let doc, configured = false, scores = {}, sortMode = 'document', relevanceThreshold = 50, selected, running = false, controller, generation = 0, activeQuestion = '', history = [], shown = 60, questionStartedAt = 0, questionJevMs = 0;
+let doc, configured = false, scores = {}, sortMode = 'document', relevanceThreshold = 75, selected, running = false, controller, generation = 0, activeQuestion = '', history = [], shown = 60, questionStartedAt = 0, questionJevMs = 0;
 let maxPdfBytes=200*1024*1024;
 let zoom=100, columns=1;
 function error(message='') { $('error').textContent=message; $('error').hidden=!message; }
@@ -101,7 +101,9 @@ function evidenceEntries() {
     const rankBase=count<=1?1:(count-1-rank)/(count-1);
     const rankPart=100*Math.pow(rankBase,4.2);
     const gapPart=highest===lowest?rankPart:100*(priorityScoreOf(item)-lowest)/(highest-lowest);
-    return {...item,salience:Math.round(rankPart*.9+gapPart*.1)};
+    const rawSalience=rankPart*.9+gapPart*.1;
+    const salience=rawSalience<=0?0:Math.round(100*Math.pow(rawSalience/100,.415));
+    return {...item,salience};
   }).filter(item=>item.salience>=relevanceThreshold);
 }
 function box(overlay,r,className,title,click) {

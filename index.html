@@ -13,7 +13,7 @@
 <div class="error" id="error" role="alert" hidden></div>
 <div class="progress-area" id="progressArea" hidden><div><span id="progressText"></span><span id="progressCount"></span></div><progress id="progress" max="100" value="0"></progress></div>
 <div class="results-head"><h3>相关原文 <span id="matchCount">—</span></h3><div class="result-actions"><label>排序 <select id="resultSort" aria-label="结果排序"><option value="document" selected>原文顺序</option><option value="relevance">相关性</option></select></label><button id="exportButton" class="quiet" disabled>导出</button></div></div>
-<div class="relevance-control" title="以本次分析中最显著的证据为 100，按相对排序与分差连续计算"><label for="relevanceThreshold">最低相对显著度 <output id="thresholdValue" for="relevanceThreshold">50%</output></label><input id="relevanceThreshold" aria-label="最低相对显著度" type="range" min="0" max="100" step="1" value="50"></div>
+<div class="relevance-control" title="以本次分析中最显著的证据为 100，按相对排序与分差连续计算"><label for="relevanceThreshold">最低相对显著度 <output id="thresholdValue" for="relevanceThreshold">75%</output></label><input id="relevanceThreshold" aria-label="最低相对显著度" type="range" min="0" max="100" step="1" value="75"></div>
 
 <div id="results" class="results"><div class="empty-results">提问后，在这里定位相关原文。</div></div><details class="history" id="history" hidden><summary>最近问题</summary><div id="historyItems"></div></details>
 </aside></main><script src="/app.js" defer></script></body></html>

@@ -111,7 +111,7 @@ def within_budget(payload):
 
 def plan_batches(document,question,mode='all',paragraph_ids=None):
     batches=[];current=[];planned=set()
-    def fits(ids): return within_budget(score_payload(document,question,ids))
+    def fits(ids): return len(ids)<=8 and within_budget(score_payload(document,question,ids))
     if mode not in {'all','paragraphs','sentences'}: raise ValueError('未知的分析阶段。')
     selected=set(paragraph_ids or [])
     if mode=='sentences' and (not selected or any(not isinstance(i,str) for i in selected)):

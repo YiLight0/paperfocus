@@ -50,15 +50,18 @@ class PaperTests(unittest.TestCase):
         with self.assertRaises(ValueError):extract_pdf(d.tobytes())
         d.close()
 
-    def test_batch_preserves_paragraph_and_exceeds_sixteen(self):
+    def test_batch_limits_questions_and_preserves_paragraph(self):
         doc=extract_pdf(fixture())
         doc['sentences']=[dict(doc['sentences'][0],id=f's{i:05}',text=f'Sentence {i} provides experimental details.') for i in range(35)]
         doc['paragraphs'][0]['sentenceIds']=[s['id'] for s in doc['sentences']]
         doc['paragraphs'][0]['text']=' '.join(s['text'] for s in doc['sentences'])
         batches=plan_batches(doc,'How was the experiment designed?')
-        self.assertEqual(len(batches),1)
-        self.assertEqual(len(batches[0]),36)
-        self.assertTrue(within_budget(score_payload(doc,'question',batches[0])))
+        self.assertEqual([len(batch) for batch in batches],[8,8,8,8,4])
+        self.assertEqual({i for batch in batches for i in batch},{doc['paragraphs'][0]['id'],*[s['id'] for s in doc['sentences']]})
+        for batch in batches:
+            payload=score_payload(doc,'question',batch)
+            self.assertTrue(within_budget(payload))
+            self.assertEqual(payload['state']['paragraphs'][doc['paragraphs'][0]['id']]['text'],doc['paragraphs'][0]['text'])
 
     def test_large_paragraph_splits_targets_not_context(self):
         doc=extract_pdf(fixture()); template=doc['sentences'][0]

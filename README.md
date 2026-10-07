@@ -89,7 +89,7 @@ TYPESAFE_PROXY=http://127.0.0.1:7890
 
 ## How the analysis works
 
-PaperFocus first scores paragraph candidates in parallel. It then evaluates sentences from up to 24 promising paragraphs, retaining at most 64 candidate evidence units and up to four per paragraph before final filtering. Request batches are created from a conservative UTF-8 byte budget; there is no fixed 16-sentence batch limit.
+PaperFocus first scores paragraph candidates in parallel. It then evaluates sentences from up to 24 promising paragraphs, retaining at most 64 candidate evidence units and up to four per paragraph before final filtering. Requests are split by a conservative UTF-8 byte budget and capped at eight scoring questions per batch.
 
 Jev's 0–3 scores are used only to rank evidence for the current question. PaperFocus converts rank and score gaps into a continuous **relative salience** scale. The strongest result is 100%; other percentages are relative to that analysis and are not statistical accuracy or calibrated confidence values.
 
